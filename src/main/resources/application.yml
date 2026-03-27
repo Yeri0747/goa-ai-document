@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: goa-ai-document
+  profiles:
+    # Profile ----------------------------------------
+    active: dev
+  # ------------------------------------------------
+  output:
+    ansi:
+      enabled: ALWAYS
+  cache:
+    type: none
+  jackson:
+    default-property-inclusion: NON_NULL
+  security:
+    oauth2:
+      jwk-uri: http://localhost:8080/api/goa-user/oauth2/jwks
+      token-uri: http://localhost:8080/api/goa-user/oauth2/token
+      api-client-id: api-client-id
+      api-client-secret: api-client-secret
+
+server:
+  port: 8091
+
+info:
+  app:
+    artifact: "@project.artifactId@"
+    version: "@project.version@"
+    build: "@maven.build.timestamp@"
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: WARN
+    es.upm: DEBUG
+    org.springframework.security: WARN
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+
+goa:
+  user:
+    base-url: http://localhost:8080/api/goa-user/users

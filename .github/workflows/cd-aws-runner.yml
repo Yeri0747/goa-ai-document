@@ -1,0 +1,62 @@
+name: CD. AWS App Runner
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  cd:
+    name: Build & Push GitHub Package & Deploy
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: 🏷️ Prepare container image metadata (repository in lowercase, artifact, version...)
+        run: |
+          echo "REPOSITORY=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+          echo "ARTIFACT=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV          
+          echo "VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
+          echo "AWS_ECR_URL=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_RUNNER }}.amazonaws.com" >> $GITHUB_ENV
+
+      - name: 📦 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PERSONAL_ACCESS_TOKEN }}
+
+      - name: 🐳 Build & Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPOSITORY }}:${{ env.VERSION }}
+            ghcr.io/${{ env.REPOSITORY }}:latest
+
+      - name: ☁ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION_RUNNER }}
+
+      - name: 🔑 Login to AWS
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 🚀 Tag and Push AWS ECR
+        run: |
+          docker pull ghcr.io/$REPOSITORY:$VERSION
+          docker tag ghcr.io/$REPOSITORY:$VERSION $AWS_ECR_URL/$REPOSITORY:latest
+          docker push $AWS_ECR_URL/$REPOSITORY:latest

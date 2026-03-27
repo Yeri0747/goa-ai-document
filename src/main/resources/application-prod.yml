@@ -1,0 +1,16 @@
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+  security:
+    oauth2:
+      jwk-uri: https://gestion.ocanabogados.es/api/goa-user/oauth2/jwks
+      token-uri: https://gestion.ocanabogados.es/api/goa-user/oauth2/token
+      api-client-id: ${API_CLIENT_ID}
+      api-client-secret: ${API_CLIENT_SECRET}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
