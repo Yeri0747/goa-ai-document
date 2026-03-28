@@ -42,13 +42,14 @@ jobs:
       # Organización de la cuenta de Sonar: yeri0747
       - name: 🏷️ Prepare container image metadata, Sonar Organization & artifact from pom
         run: |
-          echo "ORGANIZATION=yeri0747" >> $GITHUB_ENV          
+          echo "ORGANIZATION=Yeri0747" >> $GITHUB_ENV       
           echo "ARTIFACT=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
+          echo "SONAR_ORG_LOWER=$(echo $ORGANIZATION | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: 📊 Sonar Analysis
         run: >
           mvn -B sonar:sonar
-          -Dsonar.projectKey=Yeri0747_goa-ai-document
-          -Dsonar.organization=${{ env.ORGANIZATION }}
+          -Dsonar.projectKey=${{ env.ORGANIZATION }}_${{ env.ARTIFACT }}
+          -Dsonar.organization=${{ env.SONAR_ORG_LOWER }}
           -Dsonar.host.url=https://sonarcloud.io 
           -Dsonar.token=${{ secrets.SONAR_TOKEN }}
