@@ -1,7 +1,4 @@
 spring:
-  data:
-    mongodb:
-      uri: ${MONGODB_URI}
   security:
     oauth2:
       jwk-uri: https://gestion.ocanabogados.es/api/goa-user/oauth2/jwks
