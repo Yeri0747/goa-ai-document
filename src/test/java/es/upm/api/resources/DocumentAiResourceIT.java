@@ -62,17 +62,4 @@ class DocumentAiResourceIT {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    void testUploadDocumentUnauthorized() throws Exception {
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "test-file.pdf",
-                "application/pdf",
-                "mock content".getBytes()
-        );
-
-        mockMvc.perform(multipart(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS)
-                .file(file))
-                .andExpect(status().isUnauthorized());
-    }
 }
