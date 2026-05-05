@@ -52,3 +52,7 @@ feign:
 goa:
   user:
     base-url: http://localhost:8080/api/goa-user/users
+
+openai:
+  api-url: https://api.openai.com/v1/chat/completions
+  model: gpt-3.5-turbo

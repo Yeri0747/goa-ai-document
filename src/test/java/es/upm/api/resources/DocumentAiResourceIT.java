@@ -1,5 +1,7 @@
 package es.upm.api.resources;
 
+import es.upm.api.services.OpenAiClassifierService;
+import es.upm.api.services.PdfExtractorService;
 import es.upm.api.services.S3CloudService;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
@@ -28,6 +30,12 @@ class DocumentAiResourceIT {
     @MockitoBean
     private S3CloudService s3CloudService;
 
+    @MockitoBean
+    private PdfExtractorService pdfExtractorService;
+
+    @MockitoBean
+    private OpenAiClassifierService openAiClassifierService;
+
     @Test
     @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
     void testUploadDocumentSuccess() throws Exception {
@@ -45,6 +53,31 @@ class DocumentAiResourceIT {
                 .file(file))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("test-file.pdf"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
+    void testUploadDocumentSuccessWithAutoclassify() throws Exception {
+        BDDMockito.given(this.s3CloudService.uploadFile(any()))
+                .willReturn("https://mock-bucket.s3.amazonaws.com/test-file.pdf");
+        BDDMockito.given(this.pdfExtractorService.extractTextFromPdf(any()))
+                .willReturn("mock extracted text");
+        BDDMockito.given(this.openAiClassifierService.classifyText(any()))
+                .willReturn(es.upm.api.data.entities.DocumentCategory.INVOICE);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test-file.pdf",
+                "application/pdf",
+                "mock content".getBytes()
+        );
+
+        mockMvc.perform(multipart(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS)
+                .file(file)
+                .param("autoclassify", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("test-file.pdf"))
+                .andExpect(jsonPath("$.category").value("INVOICE"));
     }
 
     @Test

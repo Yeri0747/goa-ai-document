@@ -28,6 +28,12 @@ class DocumentAiServiceIT {
     @MockitoBean
     private S3CloudService s3CloudService;
 
+    @MockitoBean
+    private PdfExtractorService pdfExtractorService;
+
+    @MockitoBean
+    private OpenAiClassifierService openAiClassifierService;
+
     @Test
     void testUploadDocument() {
         BDDMockito.given(this.s3CloudService.uploadFile(any()))
@@ -40,17 +46,40 @@ class DocumentAiServiceIT {
                 "mock content".getBytes()
         );
 
-        Document savedDoc = this.documentAiService.uploadDocument(file);
+        Document savedDoc = this.documentAiService.uploadDocument(file, false);
 
         assertThat(savedDoc).isNotNull();
         assertThat(savedDoc.getId()).isNotNull();
         assertThat(savedDoc.getName()).isEqualTo("test-file.pdf");
         assertThat(savedDoc.getUrl()).isEqualTo("https://mock-bucket.s3.amazonaws.com/test-file.pdf");
+        assertThat(savedDoc.getCategory()).isNull();
 
         // Verify it was actually saved in DB
         Document dbDoc = this.documentRepository.findById(savedDoc.getId()).orElse(null);
         assertThat(dbDoc).isNotNull();
         assertThat(dbDoc.getName()).isEqualTo("test-file.pdf");
+    }
+
+    @Test
+    void testUploadDocumentWithAutoclassify() {
+        BDDMockito.given(this.s3CloudService.uploadFile(any()))
+                .willReturn("https://mock-bucket.s3.amazonaws.com/test-file.pdf");
+        BDDMockito.given(this.pdfExtractorService.extractTextFromPdf(any()))
+                .willReturn("contract text");
+        BDDMockito.given(this.openAiClassifierService.classifyText(any()))
+                .willReturn(es.upm.api.data.entities.DocumentCategory.CONTRACT);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test-file.pdf",
+                "application/pdf",
+                "mock content".getBytes()
+        );
+
+        Document savedDoc = this.documentAiService.uploadDocument(file, true);
+
+        assertThat(savedDoc).isNotNull();
+        assertThat(savedDoc.getCategory()).isEqualTo(es.upm.api.data.entities.DocumentCategory.CONTRACT);
     }
 
     @Test
@@ -62,6 +91,6 @@ class DocumentAiServiceIT {
                 "mock content".getBytes()
         );
 
-        assertThrows(BadRequestException.class, () -> this.documentAiService.uploadDocument(file));
+        assertThrows(BadRequestException.class, () -> this.documentAiService.uploadDocument(file, false));
     }
 }

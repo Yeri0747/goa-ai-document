@@ -18,3 +18,8 @@ springdoc:
 aws:
   s3:
     bucket: ${AWS_S3_BUCKET}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  api-url: ${OPENAI_API_URL:https://api.openai.com/v1/chat/completions}
+  model: ${OPENAI_MODEL:gpt-3.5-turbo}

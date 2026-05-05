@@ -24,7 +24,9 @@ public class DocumentAiResource {
     }
 
     @PostMapping(DOCUMENTS)
-    public DocumentDto uploadDocument(@RequestParam("file") MultipartFile file) {
-        return new DocumentDto(this.documentAiService.uploadDocument(file));
+    public DocumentDto uploadDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "autoclassify", defaultValue = "false") boolean autoclassify) {
+        return new DocumentDto(this.documentAiService.uploadDocument(file, autoclassify));
     }
 }
