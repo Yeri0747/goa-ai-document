@@ -23,13 +23,14 @@ public class OpenAiClassifierService {
     private final String model;
 
     public OpenAiClassifierService(
+            RestClient.Builder restClientBuilder,
             @Value("${openai.api-key:}") String apiKey,
             @Value("${openai.api-url:https://api.openai.com/v1/chat/completions}") String apiUrl,
             @Value("${openai.model:gpt-3.5-turbo}") String model) {
         this.apiKey = apiKey;
         this.apiUrl = apiUrl;
         this.model = model;
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClientBuilder.build();
     }
 
     public DocumentCategory classifyText(String text) {
