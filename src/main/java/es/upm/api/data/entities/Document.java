@@ -19,4 +19,5 @@ public class Document {
     private Long sizeInfo;
     private String url;
     private LocalDateTime uploadDate;
+    private DocumentCategory category;
 }

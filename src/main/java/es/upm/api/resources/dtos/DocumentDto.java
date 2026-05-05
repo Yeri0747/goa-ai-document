@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.BeanUtils;
 
+import es.upm.api.data.entities.DocumentCategory;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -19,6 +21,7 @@ public class DocumentDto {
     private Long sizeInfo;
     private String url;
     private LocalDateTime uploadDate;
+    private DocumentCategory category;
 
     public DocumentDto(Document document) {
         BeanUtils.copyProperties(document, this);
