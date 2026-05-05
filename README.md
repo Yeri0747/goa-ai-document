@@ -3,9 +3,9 @@
 ## Back-end con Tecnologías de Código Abierto (BETCA).
 
 ### Estado del código
-[![CI goa-ai-document](https://github.com/Yeri0747/goa-ai-document/actions/workflows/ci.yml/badge.svg)](https://github.com/miw-upm/goa-document/actions/workflows/ci.yml)
+[![CI goa-ai-document](https://github.com/Yeri0747/goa-ai-document/actions/workflows/ci.yml/badge.svg)](https://github.com/Yeri0747/goa-ai-document/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Yeri0747_goa-ai-document&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Yeri0747_goa-ai-document)
-[![AWS broken](https://gestion.ocanabogados.es/api/goa-document/system/version-badge)](https://gestion.ocanabogados.es/api/goa-document/system)
+[![AWS broken](https://x9dmu3rkbu.eu-west-1.awsapprunner.com/system/version-badge)](https://x9dmu3rkbu.eu-west-1.awsapprunner.com/system/version-badge)
 
 
 ### Tecnologías necesarias
