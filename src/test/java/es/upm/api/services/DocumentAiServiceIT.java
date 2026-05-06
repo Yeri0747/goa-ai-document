@@ -93,4 +93,26 @@ class DocumentAiServiceIT {
 
         assertThrows(BadRequestException.class, () -> this.documentAiService.uploadDocument(file, false));
     }
+
+    @Test
+    void testSummarizeDocumentFlow() {
+        Document doc = Document.builder()
+                .name("test.pdf")
+                .url("https://url-fake.com/doc.pdf")
+                .build();
+        Document saved = documentRepository.save(doc);
+
+        BDDMockito.given(pdfExtractorService.extractTextFromUrl(any()))
+                .willReturn("Texto extraído");
+        BDDMockito.given(openAiClassifierService.summarizeText("Texto extraído"))
+                .willReturn("Resumen final");
+
+        Document result = documentAiService.summarizeDocument(saved.getId());
+
+
+        assertThat(result.getSummary()).isEqualTo("Resumen final");
+
+        assertThat(documentRepository.findById(saved.getId()).get().getSummary())
+                .isEqualTo("Resumen final");
+    }
 }

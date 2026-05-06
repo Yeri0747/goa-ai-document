@@ -80,4 +80,33 @@ class OpenAiClassifierServiceIT {
         DocumentCategory category = openAiClassifierService.classifyText("");
         assertThat(category).isEqualTo(DocumentCategory.OTHER);
     }
+
+    @Test
+    void testSummarizeTextSuccess() {
+        String mockResponse = """
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "Este es un resumen de prueba impecable."
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
+                .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
+
+        String summary = openAiClassifierService.summarizeText("Texto largo para resumir...");
+
+        assertThat(summary).isEqualTo("Este es un resumen de prueba impecable.");
+    }
+
+    @Test
+    void testSummarizeTextEmptyText() {
+        String summary = openAiClassifierService.summarizeText("");
+        assertThat(summary).contains("falta API Key o texto");
+    }
+
 }

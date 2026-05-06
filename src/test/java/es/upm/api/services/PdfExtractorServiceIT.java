@@ -67,4 +67,18 @@ class PdfExtractorServiceIT {
             return baos.toByteArray();
         }
     }
+
+    @Test
+    void testExtractTextFromUrlLocal() throws IOException {
+        byte[] pdfBytes = createMockPdf("Contenido desde URL local");
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("test-url", ".pdf");
+        java.nio.file.Files.write(tempFile, pdfBytes);
+
+        String localUrl = tempFile.toUri().toURL().toString();
+
+        String result = pdfExtractorService.extractTextFromUrl(localUrl);
+
+        assertThat(result).contains("Contenido desde URL local");
+        java.nio.file.Files.deleteIfExists(tempFile);
+    }
 }
