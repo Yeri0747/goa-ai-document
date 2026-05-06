@@ -20,4 +20,5 @@ public class Document {
     private String url;
     private LocalDateTime uploadDate;
     private DocumentCategory category;
+    private String summary;
 }

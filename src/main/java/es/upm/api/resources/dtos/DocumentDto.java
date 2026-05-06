@@ -22,6 +22,7 @@ public class DocumentDto {
     private String url;
     private LocalDateTime uploadDate;
     private DocumentCategory category;
+    private String summary;
 
     public DocumentDto(Document document) {
         BeanUtils.copyProperties(document, this);

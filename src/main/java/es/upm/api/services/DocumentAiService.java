@@ -4,6 +4,7 @@ import es.upm.api.data.daos.DocumentRepository;
 import es.upm.api.data.entities.Document;
 import es.upm.api.data.entities.DocumentCategory;
 import es.upm.api.services.exceptions.BadRequestException;
+import es.upm.api.services.exceptions.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,6 +51,17 @@ public class DocumentAiService {
                 .category(category)
                 .build();
 
+        return this.documentRepository.save(document);
+    }
+
+    public Document summarizeDocument(String id) {
+        Document document = this.documentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Document not found"));
+
+        String text = this.pdfExtractorService.extractTextFromUrl(document.getUrl());
+        String summary = this.openAiClassifierService.summarizeText(text);
+
+        document.setSummary(summary);
         return this.documentRepository.save(document);
     }
 }
