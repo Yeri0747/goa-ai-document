@@ -81,4 +81,22 @@ class PdfExtractorServiceIT {
         assertThat(result).contains("Contenido desde URL local");
         java.nio.file.Files.deleteIfExists(tempFile);
     }
+
+    @Test
+    void testExtractTextFromPdfNullCase() throws IOException {
+        try (org.apache.pdfbox.pdmodel.PDDocument emptyDoc = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            String result = pdfExtractorService.extractTextFromPdf(
+                    new org.springframework.mock.web.MockMultipartFile("file", "empty.pdf", "application/pdf", new byte[0])
+            );
+            assertThat(result).isNotNull();
+        } catch (Exception e) {
+        }
+    }
+
+    @Test
+    void testExtractTextFromUrlThrowsException() {
+        assertThrows(RuntimeException.class, () ->
+                pdfExtractorService.extractTextFromUrl("not-a-url")
+        );
+    }
 }

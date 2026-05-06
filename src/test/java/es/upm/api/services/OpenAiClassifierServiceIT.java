@@ -109,4 +109,26 @@ class OpenAiClassifierServiceIT {
         assertThat(summary).contains("falta API Key o texto");
     }
 
+    @Test
+    void testSummarizeTextApiFailure() {
+        this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
+                .andRespond(withServerError());
+
+        String result = openAiClassifierService.summarizeText("texto");
+        assertThat(result).isEqualTo("Error al generar el resumen.");
+    }
+
+    @Test
+    void testClassifyTextUnrecognizedResponse() {
+        String mockResponse = """
+                { "choices": [{ "message": { "content": "CATEGORIA_INVENTADA" } }] }
+                """;
+
+        this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
+                .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
+
+        DocumentCategory category = openAiClassifierService.classifyText("contenido");
+        assertThat(category).isEqualTo(DocumentCategory.OTHER);
+    }
+
 }

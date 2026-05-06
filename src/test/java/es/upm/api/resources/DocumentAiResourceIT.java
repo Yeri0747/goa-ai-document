@@ -1,5 +1,7 @@
 package es.upm.api.resources;
 
+import es.upm.api.data.daos.DocumentRepository;
+import es.upm.api.services.DocumentAiService;
 import es.upm.api.services.OpenAiClassifierService;
 import es.upm.api.services.PdfExtractorService;
 import es.upm.api.services.S3CloudService;
@@ -16,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,6 +30,12 @@ class DocumentAiResourceIT {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private DocumentRepository documentRepository;
+
+    @Autowired
+    private DocumentAiService documentAiService;
+
     @MockitoBean
     private S3CloudService s3CloudService;
 
@@ -35,6 +44,8 @@ class DocumentAiResourceIT {
 
     @MockitoBean
     private OpenAiClassifierService openAiClassifierService;
+
+
 
     @Test
     @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
@@ -93,6 +104,25 @@ class DocumentAiResourceIT {
         mockMvc.perform(multipart(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS)
                 .file(file))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
+    void testGenerateSummarySuccess() throws Exception {
+        es.upm.api.data.entities.Document doc = es.upm.api.data.entities.Document.builder()
+                .name("test-resumen.pdf")
+                .url("https://url-hardcoded.com/file.pdf")
+                .build();
+        doc = this.documentRepository.save(doc);
+
+        BDDMockito.given(this.pdfExtractorService.extractTextFromUrl(any()))
+                .willReturn("Texto de prueba");
+        BDDMockito.given(this.openAiClassifierService.summarizeText(any()))
+                .willReturn("Este es el resumen");
+
+        mockMvc.perform(post(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + doc.getId() + "/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary").value("Este es el resumen"));
     }
 
 }
