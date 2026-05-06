@@ -3,7 +3,7 @@ spring:
     name: goa-ai-document
   profiles:
     # Profile ----------------------------------------
-    active: dev
+    active: prod
   # ------------------------------------------------
   output:
     ansi:
