@@ -34,40 +34,58 @@ public class OpenAiClassifierService {
     }
 
     public DocumentCategory classifyText(String text) {
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("OpenAI API Key is missing. Falling back to OTHER category.");
-            return DocumentCategory.OTHER;
-        }
-
-        if (text == null || text.isBlank()) {
+        if (apiKey == null || apiKey.isBlank() || text == null || text.isBlank()) {
+            if (apiKey == null || apiKey.isBlank()) {
+                log.warn("OpenAI API Key is missing. Falling back to OTHER category.");
+            }
             return DocumentCategory.OTHER;
         }
 
         String systemPrompt = """
-You are a highly accurate legal and administrative document classifier.
+            You are a highly accurate legal and administrative document classifier.
+            Classify the following document into ONE of these categories:
+            INVOICE, CONTRACT, JUDGMENT, LEGAL_BRIEF, IDENTIFICATION, OTHER.
+            Rules:
+            - Choose ONLY one category.
+            - Respond with ONLY the category name in uppercase.
+            - Do not add explanations or extra text.
+            """;
 
-Classify the following document into ONE of these categories:
+        String content = this.callOpenAi(systemPrompt, text, 0.0);
 
-INVOICE: documents related to billing, payments, totals, taxes or financial transactions.
-CONTRACT: agreements between parties, including terms, obligations, and signatures.
-JUDGMENT: court decisions, rulings, or final legal resolutions issued by a judge.
-LEGAL_BRIEF: legal writings such as claims, lawsuits, appeals, or arguments submitted to a court.
-IDENTIFICATION: personal identification documents such as ID cards, passports, or official IDs.
-OTHER: any document that does not clearly fit into the previous categories.
+        if (content != null) {
+            try {
+                return DocumentCategory.valueOf(content.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Unrecognized category from OpenAI: {}", content);
+            }
+        }
 
-Rules:
-- Choose ONLY one category.
-- Respond with ONLY the category name in uppercase.
-- Do not add explanations or extra text.
-- If uncertain, choose OTHER.
-""";
+        return DocumentCategory.OTHER;
+    }
 
+    public String summarizeText(String text) {
+        if (apiKey == null || apiKey.isBlank() || text == null || text.isBlank()) {
+            return "No se pudo generar el resumen (falta API Key o texto).";
+        }
+
+        String systemPrompt = """
+            Eres un asistente legal experto.
+            Tu tarea es generar un resumen ejecutivo del documento proporcionado.
+            Extrae los puntos clave, las partes involucradas y cualquier obligación importante.
+            """;
+
+        String content = this.callOpenAi(systemPrompt, text, 0.0);
+        return content != null ? content : "Error al generar el resumen.";
+    }
+
+    private String callOpenAi(String systemPrompt, String userText, double temperature) {
         Map<String, Object> requestBody = Map.of(
                 "model", this.model,
-                "temperature", 0.0,
+                "temperature", temperature,
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", text)
+                        Map.of("role", "user", "content", userText)
                 )
         );
 
@@ -85,63 +103,13 @@ Rules:
                 if (!choices.isEmpty()) {
                     Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
                     if (message != null && message.containsKey("content")) {
-                        String result = ((String) message.get("content")).trim().toUpperCase();
-                        try {
-                            return DocumentCategory.valueOf(result);
-                        } catch (IllegalArgumentException e) {
-                            log.warn("Unrecognized category from OpenAI: {}", result);
-                            return DocumentCategory.OTHER;
-                        }
+                        return (String) message.get("content");
                     }
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to call OpenAI API for document classification", e);
+            log.error("Failed to call OpenAI API", e);
         }
-
-        return DocumentCategory.OTHER;
-    }
-
-    public String summarizeText(String text) {
-        if (apiKey == null || apiKey.isBlank() || text == null || text.isBlank()) {
-            return "No se pudo generar el resumen (falta API Key o texto).";
-        }
-
-        String systemPrompt = """
-    Eres un asistente legal experto.
-    Tu tarea es generar un resumen ejecutivo del documento proporcionado.
-    Extrae los puntos clave, las partes involucradas y cualquier obligación importante.
-    """;
-
-        Map<String, Object> requestBody = Map.of(
-                "model", this.model,
-                "temperature", 0.0,
-                "messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", text)
-                )
-        );
-
-        try {
-            Map<String, Object> response = restClient.post()
-                    .uri(this.apiUrl)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(Map.class);
-
-            if (response != null && response.containsKey("choices")) {
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                if (!choices.isEmpty()) {
-                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-                    return (String) message.get("content");
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to call OpenAI API for document summarization", e);
-        }
-
-        return "Error al generar el resumen.";
+        return null;
     }
 }

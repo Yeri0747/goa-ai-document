@@ -18,24 +18,7 @@ public class PdfExtractorService {
 
     public String extractTextFromPdf(MultipartFile file) {
         try (PDDocument document = Loader.loadPDF(file.getInputStream().readAllBytes())) {
-            PDFTextStripper pdfStripper = new PDFTextStripper();
-            
-            // Limit extraction to the first MAX_PAGES_TO_EXTRACT pages
-            pdfStripper.setStartPage(1);
-            pdfStripper.setEndPage(MAX_PAGES_TO_EXTRACT);
-            
-            String text = pdfStripper.getText(document);
-            
-            if (text == null) {
-                return "";
-            }
-            
-            // Further limit the text to MAX_CHARS_TO_EXTRACT characters
-            if (text.length() > MAX_CHARS_TO_EXTRACT) {
-                return text.substring(0, MAX_CHARS_TO_EXTRACT);
-            }
-            
-            return text.trim();
+            return this.getTextFromDocument(document);
         } catch (IOException e) {
             throw new RuntimeException("Error extracting text from PDF", e);
         }
@@ -44,26 +27,30 @@ public class PdfExtractorService {
     public String extractTextFromUrl(String urlString) {
         try (InputStream in = new URL(urlString).openStream();
              PDDocument document = Loader.loadPDF(in.readAllBytes())) {
-
-            PDFTextStripper pdfStripper = new PDFTextStripper();
-
-            pdfStripper.setStartPage(1);
-            pdfStripper.setEndPage(MAX_PAGES_TO_EXTRACT);
-
-            String text = pdfStripper.getText(document);
-
-            if (text == null) {
-                return "";
-            }
-
-            if (text.length() > MAX_CHARS_TO_EXTRACT) {
-                return text.substring(0, MAX_CHARS_TO_EXTRACT);
-            }
-
-            return text.trim();
-
+            return this.getTextFromDocument(document);
         } catch (IOException e) {
             throw new RuntimeException("Error extracting text from PDF URL: " + urlString, e);
         }
+    }
+
+    private String getTextFromDocument(PDDocument document) throws IOException {
+        PDFTextStripper pdfStripper = new PDFTextStripper();
+
+        // Limit extraction to the first MAX_PAGES_TO_EXTRACT pages
+        pdfStripper.setStartPage(1);
+        pdfStripper.setEndPage(MAX_PAGES_TO_EXTRACT);
+
+        String text = pdfStripper.getText(document);
+
+        if (text == null) {
+            return "";
+        }
+
+        // Further limit the text to MAX_CHARS_TO_EXTRACT characters
+        if (text.length() > MAX_CHARS_TO_EXTRACT) {
+            return text.substring(0, MAX_CHARS_TO_EXTRACT);
+        }
+
+        return text.trim();
     }
 }
