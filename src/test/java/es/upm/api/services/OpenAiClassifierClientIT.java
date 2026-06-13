@@ -1,6 +1,7 @@
 package es.upm.api.services;
 
 import es.upm.api.data.entities.DocumentCategory;
+import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.client.RestClientTest;
@@ -12,11 +13,11 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 
-@RestClientTest(value = OpenAiClassifierService.class, properties = "openai.api-key=test-key")
-class OpenAiClassifierServiceIT {
+@RestClientTest(value = OpenAiClassifierClient.class, properties = "openai.api-key=test-key")
+class OpenAiClassifierClientIT {
 
     @Autowired
-    private OpenAiClassifierService openAiClassifierService;
+    private OpenAiClassifierClient openAiClassifierClient;
 
     @Autowired
     private MockRestServiceServer server;
@@ -38,7 +39,7 @@ class OpenAiClassifierServiceIT {
         this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
-        DocumentCategory category = openAiClassifierService.classifyText("billing content");
+        DocumentCategory category = openAiClassifierClient.classifyText("billing content");
 
         assertThat(category).isEqualTo(DocumentCategory.INVOICE);
     }
@@ -60,7 +61,7 @@ class OpenAiClassifierServiceIT {
         this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
-        DocumentCategory category = openAiClassifierService.classifyText("some content");
+        DocumentCategory category = openAiClassifierClient.classifyText("some content");
 
         assertThat(category).isEqualTo(DocumentCategory.OTHER);
     }
@@ -70,14 +71,14 @@ class OpenAiClassifierServiceIT {
         this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
                 .andRespond(withServerError());
 
-        DocumentCategory category = openAiClassifierService.classifyText("some content");
+        DocumentCategory category = openAiClassifierClient.classifyText("some content");
 
         assertThat(category).isEqualTo(DocumentCategory.OTHER);
     }
 
     @Test
     void testClassifyTextEmptyText() {
-        DocumentCategory category = openAiClassifierService.classifyText("");
+        DocumentCategory category = openAiClassifierClient.classifyText("");
         assertThat(category).isEqualTo(DocumentCategory.OTHER);
     }
 
@@ -98,14 +99,14 @@ class OpenAiClassifierServiceIT {
         this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
-        String summary = openAiClassifierService.summarizeText("Texto largo para resumir...");
+        String summary = openAiClassifierClient.summarizeText("Texto largo para resumir...");
 
         assertThat(summary).isEqualTo("Este es un resumen de prueba impecable.");
     }
 
     @Test
     void testSummarizeTextEmptyText() {
-        String summary = openAiClassifierService.summarizeText("");
+        String summary = openAiClassifierClient.summarizeText("");
         assertThat(summary).contains("falta API Key o texto");
     }
 
@@ -114,7 +115,7 @@ class OpenAiClassifierServiceIT {
         this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
                 .andRespond(withServerError());
 
-        String result = openAiClassifierService.summarizeText("texto");
+        String result = openAiClassifierClient.summarizeText("texto");
         assertThat(result).isEqualTo("Error al generar el resumen.");
     }
 
@@ -127,7 +128,7 @@ class OpenAiClassifierServiceIT {
         this.server.expect(requestTo("https://api.openai.com/v1/chat/completions"))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
-        DocumentCategory category = openAiClassifierService.classifyText("contenido");
+        DocumentCategory category = openAiClassifierClient.classifyText("contenido");
         assertThat(category).isEqualTo(DocumentCategory.OTHER);
     }
 

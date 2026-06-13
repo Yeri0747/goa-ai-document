@@ -2,6 +2,9 @@ package es.upm.api.services;
 
 import es.upm.api.data.daos.DocumentRepository;
 import es.upm.api.data.entities.Document;
+import es.upm.api.infrastructure.clients.S3CloudClient;
+import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
+import es.upm.api.infrastructure.support.PdfExtractor;
 import es.upm.api.services.exceptions.BadRequestException;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
@@ -26,17 +29,17 @@ class DocumentAiServiceIT {
     private DocumentRepository documentRepository;
 
     @MockitoBean
-    private S3CloudService s3CloudService;
+    private S3CloudClient s3CloudClient;
 
     @MockitoBean
-    private PdfExtractorService pdfExtractorService;
+    private PdfExtractor pdfExtractor;
 
     @MockitoBean
-    private OpenAiClassifierService openAiClassifierService;
+    private OpenAiClassifierClient openAiClassifierClient;
 
     @Test
     void testUploadDocument() {
-        BDDMockito.given(this.s3CloudService.uploadFile(any()))
+        BDDMockito.given(this.s3CloudClient.uploadFile(any()))
                 .willReturn("https://mock-bucket.s3.amazonaws.com/test-file.pdf");
 
         MockMultipartFile file = new MockMultipartFile(
@@ -62,11 +65,11 @@ class DocumentAiServiceIT {
 
     @Test
     void testUploadDocumentWithAutoclassify() {
-        BDDMockito.given(this.s3CloudService.uploadFile(any()))
+        BDDMockito.given(this.s3CloudClient.uploadFile(any()))
                 .willReturn("https://mock-bucket.s3.amazonaws.com/test-file.pdf");
-        BDDMockito.given(this.pdfExtractorService.extractTextFromPdf(any()))
+        BDDMockito.given(this.pdfExtractor.extractTextFromPdf(any()))
                 .willReturn("contract text");
-        BDDMockito.given(this.openAiClassifierService.classifyText(any()))
+        BDDMockito.given(this.openAiClassifierClient.classifyText(any()))
                 .willReturn(es.upm.api.data.entities.DocumentCategory.CONTRACT);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -102,9 +105,9 @@ class DocumentAiServiceIT {
                 .build();
         Document saved = documentRepository.save(doc);
 
-        BDDMockito.given(pdfExtractorService.extractTextFromUrl(any()))
+        BDDMockito.given(pdfExtractor.extractTextFromUrl(any()))
                 .willReturn("Texto extraído");
-        BDDMockito.given(openAiClassifierService.summarizeText("Texto extraído"))
+        BDDMockito.given(openAiClassifierClient.summarizeText("Texto extraído"))
                 .willReturn("Resumen final");
 
         Document result = documentAiService.summarizeDocument(saved.getId());

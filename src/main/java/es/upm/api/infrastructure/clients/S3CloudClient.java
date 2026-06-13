@@ -1,4 +1,4 @@
-package es.upm.api.services;
+package es.upm.api.infrastructure.clients;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,13 +11,13 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Service
-public class S3CloudService {
+public class S3CloudClient {
     private final S3Client s3Client;
 
     @Value("${aws.s3.bucket:goa-ai-documents}")
     private String bucketName;
 
-    public S3CloudService(@Value("${aws.region:eu-west-1}") String region) {
+    public S3CloudClient(@Value("${aws.region:eu-west-1}") String region) {
         this.s3Client = S3Client.builder()
                 .region(Region.of(region))
                 .build();

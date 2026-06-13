@@ -1,4 +1,4 @@
-package es.upm.api.services;
+package es.upm.api.infrastructure.support;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -11,7 +11,7 @@ import java.io.InputStream;
 import java.net.URL;
 
 @Service
-public class PdfExtractorService {
+public class PdfExtractor {
 
     private static final int MAX_PAGES_TO_EXTRACT = 3;
     private static final int MAX_CHARS_TO_EXTRACT = 2000;

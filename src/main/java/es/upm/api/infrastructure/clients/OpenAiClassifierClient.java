@@ -1,4 +1,4 @@
-package es.upm.api.services;
+package es.upm.api.infrastructure.clients;
 
 import es.upm.api.data.entities.DocumentCategory;
 import org.apache.logging.log4j.LogManager;
@@ -13,16 +13,16 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class OpenAiClassifierService {
+public class OpenAiClassifierClient {
 
-    private static final Logger log = LogManager.getLogger(OpenAiClassifierService.class);
+    private static final Logger log = LogManager.getLogger(OpenAiClassifierClient.class);
 
     private final RestClient restClient;
     private final String apiKey;
     private final String apiUrl;
     private final String model;
 
-    public OpenAiClassifierService(
+    public OpenAiClassifierClient(
             RestClient.Builder restClientBuilder,
             @Value("${openai.api-key:}") String apiKey,
             @Value("${openai.api-url:https://api.openai.com/v1/chat/completions}") String apiUrl,

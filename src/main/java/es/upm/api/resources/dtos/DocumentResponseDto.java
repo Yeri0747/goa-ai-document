@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class DocumentDto {
+public class DocumentResponseDto {
     private String id;
     private String name;
     private Long sizeInfo;
@@ -24,7 +24,7 @@ public class DocumentDto {
     private DocumentCategory category;
     private String summary;
 
-    public DocumentDto(Document document) {
+    public DocumentResponseDto(Document document) {
         BeanUtils.copyProperties(document, this);
     }
 }

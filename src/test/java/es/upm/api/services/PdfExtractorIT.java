@@ -1,5 +1,6 @@
 package es.upm.api.services;
 
+import es.upm.api.infrastructure.support.PdfExtractor;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -14,16 +15,16 @@ import java.io.IOException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class PdfExtractorServiceIT {
+class PdfExtractorIT {
 
-    private final PdfExtractorService pdfExtractorService = new PdfExtractorService();
+    private final PdfExtractor pdfExtractor = new PdfExtractor();
 
     @Test
     void testExtractTextFromPdf() throws IOException {
         byte[] pdfBytes = createMockPdf("Hello World");
         MockMultipartFile file = new MockMultipartFile("file", "test.pdf", "application/pdf", pdfBytes);
 
-        String result = pdfExtractorService.extractTextFromPdf(file);
+        String result = pdfExtractor.extractTextFromPdf(file);
 
         assertThat(result).contains("Hello World");
     }
@@ -37,7 +38,7 @@ class PdfExtractorServiceIT {
         byte[] pdfBytes = createMockPdf(longText.toString());
         MockMultipartFile file = new MockMultipartFile("file", "test.pdf", "application/pdf", pdfBytes);
 
-        String result = pdfExtractorService.extractTextFromPdf(file);
+        String result = pdfExtractor.extractTextFromPdf(file);
 
         assertThat(result.length()).isLessThanOrEqualTo(2000);
     }
@@ -46,7 +47,7 @@ class PdfExtractorServiceIT {
     void testExtractTextFromPdfInvalidFile() {
         MockMultipartFile file = new MockMultipartFile("file", "test.pdf", "application/pdf", "not a pdf".getBytes());
 
-        assertThrows(RuntimeException.class, () -> pdfExtractorService.extractTextFromPdf(file));
+        assertThrows(RuntimeException.class, () -> pdfExtractor.extractTextFromPdf(file));
     }
 
     private byte[] createMockPdf(String content) throws IOException {
@@ -76,7 +77,7 @@ class PdfExtractorServiceIT {
 
         String localUrl = tempFile.toUri().toURL().toString();
 
-        String result = pdfExtractorService.extractTextFromUrl(localUrl);
+        String result = pdfExtractor.extractTextFromUrl(localUrl);
 
         assertThat(result).contains("Contenido desde URL local");
         java.nio.file.Files.deleteIfExists(tempFile);
@@ -85,7 +86,7 @@ class PdfExtractorServiceIT {
     @Test
     void testExtractTextFromPdfNullCase() throws IOException {
         try (org.apache.pdfbox.pdmodel.PDDocument emptyDoc = new org.apache.pdfbox.pdmodel.PDDocument()) {
-            String result = pdfExtractorService.extractTextFromPdf(
+            String result = pdfExtractor.extractTextFromPdf(
                     new org.springframework.mock.web.MockMultipartFile("file", "empty.pdf", "application/pdf", new byte[0])
             );
             assertThat(result).isNotNull();
@@ -96,7 +97,7 @@ class PdfExtractorServiceIT {
     @Test
     void testExtractTextFromUrlThrowsException() {
         assertThrows(RuntimeException.class, () ->
-                pdfExtractorService.extractTextFromUrl("not-a-url")
+                pdfExtractor.extractTextFromUrl("not-a-url")
         );
     }
 }

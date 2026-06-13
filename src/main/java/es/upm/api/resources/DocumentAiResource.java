@@ -1,6 +1,6 @@
 package es.upm.api.resources;
 
-import es.upm.api.resources.dtos.DocumentDto;
+import es.upm.api.resources.dtos.DocumentResponseDto;
 import es.upm.api.services.DocumentAiService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,14 +21,14 @@ public class DocumentAiResource {
     }
 
     @PostMapping(DOCUMENTS)
-    public DocumentDto uploadDocument(
+    public DocumentResponseDto uploadDocument(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "autoclassify", defaultValue = "false") boolean autoclassify) {
-        return new DocumentDto(this.documentAiService.uploadDocument(file, autoclassify));
+        return new DocumentResponseDto(this.documentAiService.uploadDocument(file, autoclassify));
     }
 
     @PostMapping(DOCUMENTS + "/{id}/summary")
-    public DocumentDto generateSummary(@PathVariable String id) {
-        return new DocumentDto(this.documentAiService.summarizeDocument(id));
+    public DocumentResponseDto generateSummary(@PathVariable String id) {
+        return new DocumentResponseDto(this.documentAiService.summarizeDocument(id));
     }
 }

@@ -3,6 +3,9 @@ package es.upm.api.services;
 import es.upm.api.data.daos.DocumentRepository;
 import es.upm.api.data.entities.Document;
 import es.upm.api.data.entities.DocumentCategory;
+import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
+import es.upm.api.infrastructure.clients.S3CloudClient;
+import es.upm.api.infrastructure.support.PdfExtractor;
 import es.upm.api.services.exceptions.BadRequestException;
 import es.upm.api.services.exceptions.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,20 +17,20 @@ import java.time.LocalDateTime;
 @Service
 public class DocumentAiService {
 
-    private final S3CloudService s3CloudService;
+    private final S3CloudClient s3CloudClient;
     private final DocumentRepository documentRepository;
-    private final PdfExtractorService pdfExtractorService;
-    private final OpenAiClassifierService openAiClassifierService;
+    private final PdfExtractor pdfExtractor;
+    private final OpenAiClassifierClient openAiClassifierClient;
 
     @Autowired
-    public DocumentAiService(S3CloudService s3CloudService, 
+    public DocumentAiService(S3CloudClient s3CloudClient, 
                              DocumentRepository documentRepository,
-                             PdfExtractorService pdfExtractorService,
-                             OpenAiClassifierService openAiClassifierService) {
-        this.s3CloudService = s3CloudService;
+                             PdfExtractor pdfExtractor,
+                             OpenAiClassifierClient openAiClassifierClient) {
+        this.s3CloudClient = s3CloudClient;
         this.documentRepository = documentRepository;
-        this.pdfExtractorService = pdfExtractorService;
-        this.openAiClassifierService = openAiClassifierService;
+        this.pdfExtractor = pdfExtractor;
+        this.openAiClassifierClient = openAiClassifierClient;
     }
 
     public Document uploadDocument(MultipartFile file, boolean autoclassify) {
@@ -38,11 +41,11 @@ public class DocumentAiService {
         es.upm.api.data.entities.DocumentCategory category = null;
 
         if (autoclassify) {
-            String text = this.pdfExtractorService.extractTextFromPdf(file);
-            category = this.openAiClassifierService.classifyText(text);
+            String text = this.pdfExtractor.extractTextFromPdf(file);
+            category = this.openAiClassifierClient.classifyText(text);
         }
 
-        String fileUrl = this.s3CloudService.uploadFile(file);
+        String fileUrl = this.s3CloudClient.uploadFile(file);
         Document document = Document.builder()
                 .name(file.getOriginalFilename())
                 .sizeInfo(file.getSize())
@@ -58,8 +61,8 @@ public class DocumentAiService {
         Document document = this.documentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Document not found"));
 
-        String text = this.pdfExtractorService.extractTextFromUrl(document.getUrl());
-        String summary = this.openAiClassifierService.summarizeText(text);
+        String text = this.pdfExtractor.extractTextFromUrl(document.getUrl());
+        String summary = this.openAiClassifierClient.summarizeText(text);
 
         document.setSummary(summary);
         return this.documentRepository.save(document);

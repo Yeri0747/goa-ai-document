@@ -1,10 +1,10 @@
 package es.upm.api.resources;
 
 import es.upm.api.data.daos.DocumentRepository;
+import es.upm.api.infrastructure.clients.S3CloudClient;
 import es.upm.api.services.DocumentAiService;
-import es.upm.api.services.OpenAiClassifierService;
-import es.upm.api.services.PdfExtractorService;
-import es.upm.api.services.S3CloudService;
+import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
+import es.upm.api.infrastructure.support.PdfExtractor;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,20 +37,20 @@ class DocumentAiResourceIT {
     private DocumentAiService documentAiService;
 
     @MockitoBean
-    private S3CloudService s3CloudService;
+    private S3CloudClient s3CloudClient;
 
     @MockitoBean
-    private PdfExtractorService pdfExtractorService;
+    private PdfExtractor pdfExtractor;
 
     @MockitoBean
-    private OpenAiClassifierService openAiClassifierService;
+    private OpenAiClassifierClient openAiClassifierClient;
 
 
 
     @Test
     @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
     void testUploadDocumentSuccess() throws Exception {
-        BDDMockito.given(this.s3CloudService.uploadFile(any()))
+        BDDMockito.given(this.s3CloudClient.uploadFile(any()))
                 .willReturn("https://mock-bucket.s3.amazonaws.com/test-file.pdf");
 
         MockMultipartFile file = new MockMultipartFile(
@@ -69,11 +69,11 @@ class DocumentAiResourceIT {
     @Test
     @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
     void testUploadDocumentSuccessWithAutoclassify() throws Exception {
-        BDDMockito.given(this.s3CloudService.uploadFile(any()))
+        BDDMockito.given(this.s3CloudClient.uploadFile(any()))
                 .willReturn("https://mock-bucket.s3.amazonaws.com/test-file.pdf");
-        BDDMockito.given(this.pdfExtractorService.extractTextFromPdf(any()))
+        BDDMockito.given(this.pdfExtractor.extractTextFromPdf(any()))
                 .willReturn("mock extracted text");
-        BDDMockito.given(this.openAiClassifierService.classifyText(any()))
+        BDDMockito.given(this.openAiClassifierClient.classifyText(any()))
                 .willReturn(es.upm.api.data.entities.DocumentCategory.INVOICE);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -115,9 +115,9 @@ class DocumentAiResourceIT {
                 .build();
         doc = this.documentRepository.save(doc);
 
-        BDDMockito.given(this.pdfExtractorService.extractTextFromUrl(any()))
+        BDDMockito.given(this.pdfExtractor.extractTextFromUrl(any()))
                 .willReturn("Texto de prueba");
-        BDDMockito.given(this.openAiClassifierService.summarizeText(any()))
+        BDDMockito.given(this.openAiClassifierClient.summarizeText(any()))
                 .willReturn("Este es el resumen");
 
         mockMvc.perform(post(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + doc.getId() + "/summary"))
