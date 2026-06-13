@@ -1,4 +1,4 @@
-package es.upm.api.services;
+package es.upm.api.infrastructure.clients;
 
 import es.upm.api.data.entities.DocumentCategory;
 import es.upm.api.infrastructure.clients.OpenAiClassifierClient;

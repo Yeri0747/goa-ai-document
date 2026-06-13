@@ -1,4 +1,4 @@
-package es.upm.api.services;
+package es.upm.api.infrastructure.support;
 
 import es.upm.api.infrastructure.support.PdfExtractor;
 import org.apache.pdfbox.pdmodel.PDDocument;
