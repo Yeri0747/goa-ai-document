@@ -8,6 +8,7 @@ import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
 import es.upm.api.infrastructure.support.PdfExtractor;
 import es.upm.api.infrastructure.clients.AwsTextractClient;
 import es.upm.api.infrastructure.support.FileDownloader;
+import es.upm.api.services.exceptions.BadRequestException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
@@ -191,5 +192,213 @@ class DocumentAiResourceIT {
     void testExtractInvoiceEndpointValidationFailure() throws Exception {
         mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/non-existent-id" + DocumentAiResource.EXTRACT_INVOICE))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
+    void testExtractInvoiceEndpointWithCompleteData() throws Exception {
+        String url = "https://mock-invoices.com/complete.pdf";
+        byte[] mockBytes = "mock pdf content".getBytes();
+
+        es.upm.api.data.entities.Document document = es.upm.api.data.entities.Document.builder()
+                .name("complete-invoice.pdf")
+                .url(url)
+                .category(es.upm.api.data.entities.DocumentCategory.INVOICE)
+                .build();
+        document = this.documentRepository.save(document);
+
+        BDDMockito.given(this.fileDownloader.downloadFile(url))
+                .willReturn(mockBytes);
+
+        AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
+                .expenseDocuments(ExpenseDocument.builder()
+                        .summaryFields(
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("VENDOR_NAME").build())
+                                        .valueDetection(ExpenseDetection.builder().text("Premium Supplier").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("INVOICE_RECEIPT_DATE").build())
+                                        .valueDetection(ExpenseDetection.builder().text("2026-06-01").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("INVOICE_RECEIPT_ID").build())
+                                        .valueDetection(ExpenseDetection.builder().text("INV-003-2026").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("DUE_DATE").build())
+                                        .valueDetection(ExpenseDetection.builder().text("2026-06-30").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("RECEIVER_NAME").build())
+                                        .valueDetection(ExpenseDetection.builder().text("My Business SL").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("RECEIVER_TAX_ID").build())
+                                        .valueDetection(ExpenseDetection.builder().text("ES87654321B").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("SUBTOTAL").build())
+                                        .valueDetection(ExpenseDetection.builder().text("1000.00").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("TAX").build())
+                                        .valueDetection(ExpenseDetection.builder().text("210.00").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("TOTAL").build())
+                                        .valueDetection(ExpenseDetection.builder().text("1210.00").build())
+                                        .currency(ExpenseCurrency.builder().code("EUR").build())
+                                        .build()
+                        )
+                        .build())
+                .build();
+
+        BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
+                .willReturn(mockResponse);
+
+        mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vendorName").value("Premium Supplier"))
+                .andExpect(jsonPath("$.invoiceDate").value("2026-06-01"))
+                .andExpect(jsonPath("$.invoiceId").value("INV-003-2026"))
+                .andExpect(jsonPath("$.dueDate").value("2026-06-30"))
+                .andExpect(jsonPath("$.receiverName").value("My Business SL"))
+                .andExpect(jsonPath("$.receiverTaxId").value("ES87654321B"))
+                .andExpect(jsonPath("$.subtotal").value("1000.00"))
+                .andExpect(jsonPath("$.taxAmount").value("210.00"))
+                .andExpect(jsonPath("$.total").value("1210.00"))
+                .andExpect(jsonPath("$.currency").value("EUR"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
+    void testExtractInvoiceEndpointWithMultipleLineItems() throws Exception {
+        String url = "https://mock-invoices.com/multi-line.pdf";
+        byte[] mockBytes = "mock pdf content".getBytes();
+
+        es.upm.api.data.entities.Document document = es.upm.api.data.entities.Document.builder()
+                .name("multi-items-invoice.pdf")
+                .url(url)
+                .category(es.upm.api.data.entities.DocumentCategory.INVOICE)
+                .build();
+        document = this.documentRepository.save(document);
+
+        BDDMockito.given(this.fileDownloader.downloadFile(url))
+                .willReturn(mockBytes);
+
+        AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
+                .expenseDocuments(ExpenseDocument.builder()
+                        .summaryFields(
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("VENDOR_NAME").build())
+                                        .valueDetection(ExpenseDetection.builder().text("Multi Items Corp").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("TOTAL").build())
+                                        .valueDetection(ExpenseDetection.builder().text("600.00").build())
+                                        .currency(ExpenseCurrency.builder().code("USD").build())
+                                        .build()
+                        )
+                        .lineItemGroups(
+                                LineItemGroup.builder()
+                                        .lineItems(
+                                                LineItemFields.builder()
+                                                        .lineItemExpenseFields(
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("ITEM").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("Product A").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("QUANTITY").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("3").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("UNIT_PRICE").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("100.00").build())
+                                                                        .build()
+                                                        )
+                                                        .build(),
+                                                LineItemFields.builder()
+                                                        .lineItemExpenseFields(
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("ITEM").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("Product B").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("QUANTITY").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("2").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("PRICE").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("150.00").build())
+                                                                        .build()
+                                                        )
+                                                        .build()
+                                        )
+                                        .build()
+                        )
+                        .build())
+                .build();
+
+        BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
+                .willReturn(mockResponse);
+
+        mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vendorName").value("Multi Items Corp"))
+                .andExpect(jsonPath("$.total").value("600.00"))
+                .andExpect(jsonPath("$.lineItems").isArray())
+                .andExpect(jsonPath("$.lineItems.length()").value(2))
+                .andExpect(jsonPath("$.lineItems[0].name").value("Product A"))
+                .andExpect(jsonPath("$.lineItems[0].quantity").value("3"))
+                .andExpect(jsonPath("$.lineItems[1].name").value("Product B"))
+                .andExpect(jsonPath("$.lineItems[1].quantity").value("2"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
+    void testExtractInvoiceEndpointThrowsExceptionWhenTextractEmpty() throws Exception {
+        String url = "https://mock-invoices.com/empty-textract.pdf";
+        byte[] mockBytes = "mock pdf content".getBytes();
+
+        es.upm.api.data.entities.Document document = es.upm.api.data.entities.Document.builder()
+                .name("empty-response.pdf")
+                .url(url)
+                .category(es.upm.api.data.entities.DocumentCategory.INVOICE)
+                .build();
+        document = this.documentRepository.save(document);
+
+        BDDMockito.given(this.fileDownloader.downloadFile(url))
+                .willReturn(mockBytes);
+
+        AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
+                .expenseDocuments(new ExpenseDocument[]{})
+                .build();
+
+        BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
+                .willReturn(mockResponse);
+
+        mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
+    void testExtractInvoiceEndpointDownloadFailure() throws Exception {
+        String url = "https://mock-invoices.com/unreachable.pdf";
+
+        es.upm.api.data.entities.Document document = es.upm.api.data.entities.Document.builder()
+                .name("unreachable.pdf")
+                .url(url)
+                .category(es.upm.api.data.entities.DocumentCategory.INVOICE)
+                .build();
+        document = this.documentRepository.save(document);
+
+        BDDMockito.given(this.fileDownloader.downloadFile(url))
+                .willThrow(new BadRequestException("Error al descargar el archivo desde la URL"));
+
+        mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
+                .andExpect(status().isBadRequest());
     }
 }
