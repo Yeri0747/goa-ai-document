@@ -109,6 +109,11 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
         </dependency>
+        <!-- AWS Textract -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>textract</artifactId>
+        </dependency>
         <!-- Spring Validación de tokens -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

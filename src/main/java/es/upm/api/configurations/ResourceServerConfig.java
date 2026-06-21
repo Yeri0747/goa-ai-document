@@ -33,7 +33,7 @@ import static org.springframework.security.config.http.SessionCreationPolicy.STA
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-public class ResourceServerConfig {  // validate tokens y security APIs con SCOPE_*.
+public class ResourceServerConfig { // validate tokens y security APIs con SCOPE_*.
     public static final String CLAIM_NAME = "roles";
     public static final String AWS_CLAIM_NAME = "cognito:groups";
     private static final String PREFIX = "ROLE_";
@@ -61,11 +61,9 @@ public class ResourceServerConfig {  // validate tokens y security APIs con SCOP
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/document-ai/documents/**").permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
-                        jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                )
+                        jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .build();
     }
 

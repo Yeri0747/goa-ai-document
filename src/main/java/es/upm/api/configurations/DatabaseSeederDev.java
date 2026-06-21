@@ -21,6 +21,7 @@ public class DatabaseSeederDev {
     public static final String DOC_ID_2 = "doc-0002";
 
     private final DocumentRepository documentRepository;
+    private final es.upm.api.data.daos.InvoiceRepository invoiceRepository;
 
     @PostConstruct
     public void init() {
@@ -34,6 +35,7 @@ public class DatabaseSeederDev {
 
     private void deleteAllAndInitialize() {
         this.documentRepository.deleteAll();
+        this.invoiceRepository.deleteAll();
         log.warn("------- Delete All -----------");
     }
 

@@ -4,5 +4,6 @@
 *.iml
 *.ipr
 .vscode
+.env
 
 target
