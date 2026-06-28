@@ -46,6 +46,25 @@ El código sigue una arquitectura en capas (`resources` -> `services` ->
 `data` / `infrastructure`). La estructura de paquetes se detalla en la sección
 siguiente.
 
+## Alcance actual de Document AI
+
+Este microservicio expone **acciones de dominio**, no un CRUD REST completo:
+
+| Operación | Endpoint (resumen) |
+|-----------|-------------------|
+| Subir PDF | `POST /document-ai/documents` |
+| Resumir documento | `POST /document-ai/documents/{id}/summary` |
+| Extraer factura | `GET /document-ai/documents/{id}/invoice` |
+
+Implicaciones para la guía:
+
+- La entrada principal es **multipart** (`MultipartFile`), no DTOs JSON de creación.
+- Los DTOs actuales son solo de **salida** (`*ResponseDto`).
+- No hay endpoint de **búsqueda** parametrizada → no se usa capa `criteria`.
+- En el **despliegue actual**, los endpoints `/document-ai/documents/**` son
+  **públicos** (`permitAll` en `ResourceServerConfig`). Las reglas de
+  `@PreAuthorize` solo aplican si ese despliegue cambia.
+
 ## Estructura real del microservicio
 
 ```text
@@ -72,38 +91,37 @@ Notas:
 ## Recursos (HTTP)
 
 - DEBE usar `@RestController` y sufijo `Resource`.
-- DEBE delegar logica de negocio al servicio.
+- DEBE delegar logica de negocio al servicio (salvo endpoints de sistema como `/system`, donde la lógica de presentación puede permanecer en el resource).
 - DEBE usar rutas base como constantes (`public static final String ...`).
 - DEBE usar inyeccion por constructor (`@RequiredArgsConstructor` o constructor explicito).
-- DEBERIA validar entrada con `@Valid` y regex de `Validations` si aplica.
+- DEBERIA validar entrada con `@Valid` cuando el endpoint reciba un DTO JSON.
+  Para multipart (`MultipartFile`, `@RequestParam`), validar en el servicio o con
+  anotaciones de validacion propias.
 
 ## DTOs
 
 - DEBE ubicarse en `resources.dtos`.
-- DEBE seguir esta convencion:
-  - `XxxResponseDto`: solo salida.
+- Hoy el API solo expone DTOs de salida (`*ResponseDto`). Cuando existan endpoints
+  con body JSON, aplicar ademas:
   - `XxxCreationDto`: solo entrada de creacion.
   - `XxxUpdatingDto`: solo entrada de actualizacion.
   - `XxxDto`: entrada/salida, marcando asimetrias con
     `@JsonProperty(access = Access.READ_ONLY)` y
     `@JsonProperty(access = Access.WRITE_ONLY)`.
-- DEBE mantener conversion DTO <-> entidad en capa `resources.dtos` (constructores y `toDomain()`).
+- DEBE mantener conversion DTO <-> entidad en capa `resources.dtos`:
+  - constructores desde entidad para `*ResponseDto`;
+  - `toDomain()` cuando exista DTO de entrada.
 - NO DEBE mover DTOs a capa `services`.
-
-## Criterios
-
-- DEBE vivir en `services.criteria` si el proyecto necesita consultas parametrizadas.
-- DEBERIA usar sufijo `FindCriteria`.
-- DEBERIA recibirse en resources via `@ModelAttribute`.
-- NO DEBE contener anotaciones de serializacion HTTP.
-- Nota: actualmente no hay endpoint de busqueda en `goa-ai-document`, por lo que esta capa no es obligatoria hoy.
 
 ## Servicios
 
 - DEBE usar `@Service` y sufijo `Service`.
 - DEBE trabajar con entidades (no con DTOs) en la logica de negocio.
-- DEBERIA mantener nombres consistentes: `create`, `read`, `update`, `delete`, `find`.
-- DEBE lanzar `NotFoundException` en `read/update/delete` cuando no exista recurso.
+- DEBERIA usar nombres que describan la operacion de dominio (`uploadDocument`,
+  `summarizeDocument`, `extractInvoice`, etc.). El patron `create`, `read`,
+  `update`, `delete`, `find` solo aplica si el endpoint es CRUD.
+- DEBE lanzar `NotFoundException` cuando la operacion requiere un recurso
+  persistido que no existe.
 - DEBERIA encapsular invariantes en metodos privados (`assertXxx`, `validateXxx`, etc.).
 
 ## Persistencia (Mongo)
@@ -117,7 +135,6 @@ Notas:
 
 - DEBE ser `@Document` sin sufijo.
 - DEBE marcar id con `@Id`.
-- DEBERIA usar `@Indexed(unique = true)` en campos unicos.
 - PUEDE usar `@DBRef` si la relacion lo requiere.
 
 ## Infrastructure support
@@ -129,13 +146,21 @@ Notas:
 ## Infrastructure clients
 
 - DEBE contener clientes/adaptadores de salida a servicios externos.
-- DEBE aislar detalles de protocolo/integracion (AWS S3, OpenAI, Feign, headers, etc.).
+- DEBE aislar detalles de protocolo/integracion (AWS SDK, OpenAI, RestClient, headers, etc.).
 - No mezclar clientes externos con utilidades internas en el mismo paquete.
 
 ## Seguridad
 
-- DEBE proteger endpoints con `@PreAuthorize` si el proyecto requiere autorizacion por rol.
-- DEBE usar constantes de `Security`.
+### Despliegue actual
+
+Los endpoints de Document AI (`/document-ai/documents/**`) son **publicos** en
+`ResourceServerConfig`. No se exige `@PreAuthorize` ni token JWT para consumirlos
+desde `goa-front`.
+
+### Si el despliegue requiere autorizacion por rol
+
+- DEBE proteger endpoints con `@PreAuthorize`.
+- DEBE usar constantes de `Security` (no SpEL literal en la anotacion).
 - DEBERIA mantener visible la regla de autorizacion en cada metodo sensible.
 - DEBE mantener coherencia entre las reglas de `@PreAuthorize` y la configuracion de `ResourceServerConfig`.
 
@@ -164,7 +189,9 @@ Convencion actual:
 Reglas:
 - DEBE cubrir casos felices y de error.
 - DEBE restaurar estado cuando el test muta datos compartidos.
-- DEBERIA usar `@WithMockUser` en pruebas de servicio que dependan de rol.
+- DEBERIA usar `@WithMockUser` solo en pruebas que ejercen autorizacion por rol
+  (p. ej. tests HTTP cuando los endpoints esten protegidos). No es necesario en
+  tests de servicio si la logica no depende del contexto de seguridad.
 
 ## Tecnologia y build
 
@@ -182,6 +209,5 @@ Regla de entorno:
 
 - DTOs en capa `services`.
 - Exponer entidades directamente desde resources.
-- SpEL literal en `@PreAuthorize`.
 - Logica de negocio en constructores de beans.
 - Mezclar utilidades internas (`support`) con clientes externos (`clients`) en el mismo paquete.
