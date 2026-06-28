@@ -3,6 +3,7 @@ package es.upm.api.services;
 import es.upm.api.data.daos.DocumentRepository;
 import es.upm.api.data.daos.InvoiceRepository;
 import es.upm.api.data.entities.Document;
+import es.upm.api.data.entities.DocumentCategory;
 import es.upm.api.data.entities.Invoice;
 import es.upm.api.infrastructure.clients.AwsTextractClient;
 import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
@@ -58,6 +59,54 @@ class DocumentAiServiceTest {
 
     @InjectMocks
     private DocumentAiService documentAiService;
+
+    @Test
+    void uploadDocumentSuccess() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "test.pdf", "application/pdf", "content".getBytes());
+        Document saved = Document.builder()
+                .id("doc-1")
+                .name("test.pdf")
+                .url("https://bucket.s3.amazonaws.com/test.pdf")
+                .build();
+
+        given(s3CloudClient.uploadFile(file)).willReturn("https://bucket.s3.amazonaws.com/test.pdf");
+        given(documentRepository.save(any(Document.class))).willReturn(saved);
+
+        Document result = documentAiService.uploadDocument(file, false);
+
+        assertThat(result.getName()).isEqualTo("test.pdf");
+        assertThat(result.getUrl()).isEqualTo("https://bucket.s3.amazonaws.com/test.pdf");
+        verify(pdfExtractor, never()).extractTextFromPdf(any());
+    }
+
+    @Test
+    void uploadDocumentWithAutoclassify() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "test.pdf", "application/pdf", "content".getBytes());
+        Document saved = Document.builder()
+                .id("doc-1")
+                .name("test.pdf")
+                .category(DocumentCategory.CONTRACT)
+                .build();
+
+        given(pdfExtractor.extractTextFromPdf(file)).willReturn("contract text");
+        given(openAiClassifierClient.classifyText("contract text")).willReturn(DocumentCategory.CONTRACT);
+        given(s3CloudClient.uploadFile(file)).willReturn("https://bucket.s3.amazonaws.com/test.pdf");
+        given(documentRepository.save(any(Document.class))).willReturn(saved);
+
+        Document result = documentAiService.uploadDocument(file, true);
+
+        assertThat(result.getCategory()).isEqualTo(DocumentCategory.CONTRACT);
+    }
+
+    @Test
+    void extractInvoiceDocumentNotFound() {
+        given(invoiceRepository.findByDocumentId("missing")).willReturn(Optional.empty());
+        given(documentRepository.findById("missing")).willReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> documentAiService.extractInvoice("missing"));
+    }
 
     @Test
     void summarizeDocumentNotFound() {
