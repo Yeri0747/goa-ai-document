@@ -1,4 +1,4 @@
-package es.upm.api.services.exceptions;
+package es.upm.api.exceptions;
 
 public class ForbiddenException extends RuntimeException {
     private static final String DESCRIPTION = "Forbidden Exception";

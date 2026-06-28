@@ -9,7 +9,8 @@ import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
 import es.upm.api.infrastructure.clients.S3CloudClient;
 import es.upm.api.infrastructure.support.FileDownloader;
 import es.upm.api.infrastructure.support.PdfExtractor;
-import es.upm.api.services.exceptions.BadRequestException;
+import es.upm.api.exceptions.BadRequestException;
+import es.upm.api.exceptions.NotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
@@ -57,6 +58,7 @@ class DocumentAiServiceIT {
         @AfterEach
         void tearDown() {
                 this.invoiceRepository.deleteAll();
+                this.documentRepository.deleteAll();
         }
 
         @Test
@@ -303,8 +305,8 @@ class DocumentAiServiceIT {
         @Test
         void testExtractInvoiceDocumentNotFound() {
                 String nonExistentId = "non-existent-document-id";
-                es.upm.api.services.exceptions.NotFoundException exception = assertThrows(
-                                es.upm.api.services.exceptions.NotFoundException.class,
+                NotFoundException exception = assertThrows(
+                                NotFoundException.class,
                                 () -> this.documentAiService.extractInvoice(nonExistentId)
                 );
                 assertThat(exception.getMessage()).contains("Document not found");

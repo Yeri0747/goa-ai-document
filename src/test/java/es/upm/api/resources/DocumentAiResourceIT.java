@@ -8,7 +8,7 @@ import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
 import es.upm.api.infrastructure.support.PdfExtractor;
 import es.upm.api.infrastructure.clients.AwsTextractClient;
 import es.upm.api.infrastructure.support.FileDownloader;
-import es.upm.api.services.exceptions.BadRequestException;
+import es.upm.api.exceptions.BadRequestException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
@@ -65,6 +65,7 @@ class DocumentAiResourceIT {
     @AfterEach
     void tearDown() {
         this.invoiceRepository.deleteAll();
+        this.documentRepository.deleteAll();
     }
 
     @Test

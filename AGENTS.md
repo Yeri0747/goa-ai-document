@@ -10,15 +10,41 @@ Documento normativo para contribuir en `goa-ai-document`.
 
 ## Arquitectura general
 
-Sistema de microservicios con Eureka + API Gateway + servicios Spring Boot.
+`goa-ai-document` es un microservicio Spring Boot del ecosistema GOA, responsable
+de las capacidades de Document AI: subida de PDF, clasificación, resumen e
+extracción de datos de facturas.
+
+### Integración con el cliente
+
+En el módulo Document AI de `goa-front`, las peticiones se dirigen **directamente**
+a este microservicio mediante la URL configurada en `REST_AI_DOCUMENT`
+(p. ej. `http://localhost:8091` en desarrollo). **No** enrutan por el API Gateway
+ni dependen del registro en Eureka.
 
 ```text
-eureka
+goa-front (Document AI)
   ->
-gateway
+goa-ai-document (/document-ai/...)
   ->
-microservicios (goa-ai-document, ...)
+MongoDB | Amazon S3 | OpenAI | AWS Textract
 ```
+
+### Contexto del ecosistema GOA
+
+El resto de módulos de GOA siguen un esquema de microservicios con API Gateway
+y registro dinámico (Eureka). Ese patrón **no forma parte del despliegue actual**
+de Document AI, aunque `goa-ai-document` comparte stack y convenciones con el
+resto de servicios Spring Boot del proyecto.
+
+```text
+[eureka -> gateway -> otros microservicios GOA]   (fuera del alcance de Document AI)
+```
+
+### Organización interna
+
+El código sigue una arquitectura en capas (`resources` -> `services` ->
+`data` / `infrastructure`). La estructura de paquetes se detalla en la sección
+siguiente.
 
 ## Estructura real del microservicio
 
@@ -41,6 +67,7 @@ es.upm.api/
 Notas:
 - No existe paquete `integrations/`; los clientes externos deben ubicarse en `infrastructure.clients`.
 - `infrastructure.support` contiene utilidades tecnicas reutilizables por servicios.
+- El seeder de desarrollo vive en `configurations` como `DatabaseSeederDev`.
 
 ## Recursos (HTTP)
 
@@ -48,8 +75,6 @@ Notas:
 - DEBE delegar logica de negocio al servicio.
 - DEBE usar rutas base como constantes (`public static final String ...`).
 - DEBE usar inyeccion por constructor (`@RequiredArgsConstructor` o constructor explicito).
-- DEBERIA proteger metodos con `@PreAuthorize` usando constantes de `Security` cuando haya autorizacion de roles.
-- NO DEBE usar SpEL literal en `@PreAuthorize`.
 - DEBERIA validar entrada con `@Valid` y regex de `Validations` si aplica.
 
 ## DTOs
@@ -117,15 +142,17 @@ Notas:
 ## Excepciones y errores
 
 - DEBE usar excepciones de dominio cuando aplique.
+- DEBE ubicarlas en `exceptions` (p. ej. `NotFoundException`, `BadRequestException`).
 - DEBE centralizar mapeo HTTP en `resources.httperrors.ApiExceptionHandler`.
 - NO DEBE declarar excepciones en paquetes de entidades.
 
 ## Inicializadores y seeders
 
-- DEBE implementarse con `ApplicationRunner`.
-- DEBE ejecutar logica en `run(...)`.
-- `SeederForDev` DEBE limitarse a perfiles `dev` y `test`.
-- DEBERIA usar ids fijos cuando los tests dependan de esos ids.
+- DEBE implementarse en `configurations` con la clase `DatabaseSeederDev`.
+- DEBE limitarse a perfiles `dev` y `test` (`@Profile({"dev", "test"})`).
+- DEBE ejecutar la logica de carga en un metodo invocado desde `@PostConstruct` (p. ej. `init()`).
+- DEBERIA usar ids fijos como constantes publicas cuando los tests dependan de esos ids
+  (p. ej. `DOC_ID_1`, `DOC_ID_2`).
 
 ## Tests
 

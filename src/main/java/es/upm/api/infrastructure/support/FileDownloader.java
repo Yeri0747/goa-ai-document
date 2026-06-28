@@ -1,6 +1,6 @@
 package es.upm.api.infrastructure.support;
 
-import es.upm.api.services.exceptions.BadRequestException;
+import es.upm.api.exceptions.BadRequestException;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
