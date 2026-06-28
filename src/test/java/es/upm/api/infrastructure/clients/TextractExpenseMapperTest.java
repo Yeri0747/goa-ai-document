@@ -1,13 +1,14 @@
 package es.upm.api.infrastructure.clients;
 
 import es.upm.api.data.entities.Invoice;
+import es.upm.api.data.entities.LineItem;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.textract.model.*;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class TextractExpenseMapperTest {
 
@@ -199,5 +200,106 @@ class TextractExpenseMapperTest {
         assertThat(invoice.getTaxAmount()).isEqualTo("168.00");
         assertThat(invoice.getTotal()).isEqualTo("968.00");
         assertThat(invoice.getCurrency()).isEqualTo("EUR");
+    }
+
+    @Test
+    void mapNullExpenseDocumentsThrows() {
+        AnalyzeExpenseResponse response = mock(AnalyzeExpenseResponse.class);
+        when(response.expenseDocuments()).thenReturn(null);
+
+        assertThrows(TextractExtractionException.class, () -> TextractExpenseMapper.map(response));
+    }
+
+    @Test
+    void mapWithoutSummaryFieldsOrLineItems() {
+        AnalyzeExpenseResponse response = AnalyzeExpenseResponse.builder()
+                .expenseDocuments(ExpenseDocument.builder().build())
+                .build();
+
+        Invoice invoice = TextractExpenseMapper.map(response);
+
+        assertThat(invoice.getVendorName()).isNull();
+        assertThat(invoice.getLineItems()).isEmpty();
+    }
+
+    @Test
+    void mapTaxPayerIdAndIgnoresUnknownSummaryFields() {
+        AnalyzeExpenseResponse response = AnalyzeExpenseResponse.builder()
+                .expenseDocuments(ExpenseDocument.builder()
+                        .summaryFields(
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("TAX_PAYER_ID").build())
+                                        .valueDetection(ExpenseDetection.builder().text("ES99999999Z").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("UNKNOWN_FIELD").build())
+                                        .valueDetection(ExpenseDetection.builder().text("ignored").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("TOTAL").build())
+                                        .build(),
+                                ExpenseField.builder()
+                                        .type(ExpenseType.builder().text("TOTAL").build())
+                                        .valueDetection(ExpenseDetection.builder().text("10.00").build())
+                                        .currency(ExpenseCurrency.builder().build())
+                                        .build()
+                        )
+                        .build())
+                .build();
+
+        Invoice invoice = TextractExpenseMapper.map(response);
+
+        assertThat(invoice.getReceiverTaxId()).isEqualTo("ES99999999Z");
+        assertThat(invoice.getTotal()).isEqualTo("10.00");
+        assertThat(invoice.getCurrency()).isNull();
+    }
+
+    @Test
+    void mapLineItemGroupsWithNullEntriesAndAllFieldTypes() {
+        AnalyzeExpenseResponse response = AnalyzeExpenseResponse.builder()
+                .expenseDocuments(ExpenseDocument.builder()
+                        .lineItemGroups(
+                                LineItemGroup.builder().build(),
+                                LineItemGroup.builder()
+                                        .lineItems(
+                                                LineItemFields.builder().build(),
+                                                LineItemFields.builder()
+                                                        .lineItemExpenseFields(
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("ITEM").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("Product").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("QUANTITY").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("2").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("PRICE").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("40.00").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("UNIT_PRICE").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("20.00").build())
+                                                                        .build(),
+                                                                ExpenseField.builder()
+                                                                        .type(ExpenseType.builder().text("UNKNOWN").build())
+                                                                        .valueDetection(ExpenseDetection.builder().text("skip").build())
+                                                                        .build()
+                                                        )
+                                                        .build()
+                                        )
+                                        .build()
+                        )
+                        .build())
+                .build();
+
+        Invoice invoice = TextractExpenseMapper.map(response);
+
+        assertThat(invoice.getLineItems()).hasSize(2);
+        LineItem mapped = invoice.getLineItems().get(1);
+        assertThat(mapped.getName()).isEqualTo("Product");
+        assertThat(mapped.getQuantity()).isEqualTo("2");
+        assertThat(mapped.getPrice()).isEqualTo("40.00");
+        assertThat(mapped.getUnitPrice()).isEqualTo("20.00");
     }
 }
