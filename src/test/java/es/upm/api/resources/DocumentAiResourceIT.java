@@ -2,26 +2,28 @@ package es.upm.api.resources;
 
 import es.upm.api.data.daos.DocumentRepository;
 import es.upm.api.data.daos.InvoiceRepository;
-import es.upm.api.infrastructure.clients.S3CloudClient;
-import es.upm.api.services.DocumentAiService;
-import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
-import es.upm.api.infrastructure.support.PdfExtractor;
+import es.upm.api.data.entities.Invoice;
 import es.upm.api.infrastructure.clients.AwsTextractClient;
+import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
+import es.upm.api.infrastructure.clients.S3CloudClient;
+import es.upm.api.infrastructure.clients.TextractExtractionException;
 import es.upm.api.infrastructure.support.FileDownloader;
-import es.upm.api.exceptions.BadRequestException;
+import es.upm.api.infrastructure.support.PdfExtractor;
+import es.upm.api.services.DocumentAiService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import software.amazon.awssdk.services.textract.model.*;
+
+import java.io.IOException;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -148,6 +150,13 @@ class DocumentAiResourceIT {
 
     @Test
     @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
+    void testGenerateSummaryNotFound() throws Exception {
+        mockMvc.perform(post(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/non-existent-id/summary"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_admin"})
     void testExtractInvoiceEndpointSuccess() throws Exception {
         String url = "https://mock-invoices.com/invoice-002.pdf";
         byte[] mockBytes = "mock pdf content".getBytes();
@@ -159,27 +168,16 @@ class DocumentAiResourceIT {
                 .build();
         document = this.documentRepository.save(document);
 
-        BDDMockito.given(this.fileDownloader.downloadFile(url))
-                .willReturn(mockBytes);
+        BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-        AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                .expenseDocuments(ExpenseDocument.builder()
-                        .summaryFields(
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("VENDOR_NAME").build())
-                                        .valueDetection(ExpenseDetection.builder().text("Amazon Web Services").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("TOTAL").build())
-                                        .valueDetection(ExpenseDetection.builder().text("45.67").build())
-                                        .currency(ExpenseCurrency.builder().code("USD").build())
-                                        .build()
-                        )
-                        .build())
+        Invoice mockExtracted = Invoice.builder()
+                .vendorName("Amazon Web Services")
+                .total("45.67")
+                .currency("USD")
                 .build();
 
-        BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                .willReturn(mockResponse);
+        BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                .willReturn(mockExtracted);
 
         mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
                 .andExpect(status().isOk())
@@ -208,55 +206,23 @@ class DocumentAiResourceIT {
                 .build();
         document = this.documentRepository.save(document);
 
-        BDDMockito.given(this.fileDownloader.downloadFile(url))
-                .willReturn(mockBytes);
+        BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-        AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                .expenseDocuments(ExpenseDocument.builder()
-                        .summaryFields(
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("VENDOR_NAME").build())
-                                        .valueDetection(ExpenseDetection.builder().text("Premium Supplier").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("INVOICE_RECEIPT_DATE").build())
-                                        .valueDetection(ExpenseDetection.builder().text("2026-06-01").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("INVOICE_RECEIPT_ID").build())
-                                        .valueDetection(ExpenseDetection.builder().text("INV-003-2026").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("DUE_DATE").build())
-                                        .valueDetection(ExpenseDetection.builder().text("2026-06-30").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("RECEIVER_NAME").build())
-                                        .valueDetection(ExpenseDetection.builder().text("My Business SL").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("RECEIVER_TAX_ID").build())
-                                        .valueDetection(ExpenseDetection.builder().text("ES87654321B").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("SUBTOTAL").build())
-                                        .valueDetection(ExpenseDetection.builder().text("1000.00").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("TAX").build())
-                                        .valueDetection(ExpenseDetection.builder().text("210.00").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("TOTAL").build())
-                                        .valueDetection(ExpenseDetection.builder().text("1210.00").build())
-                                        .currency(ExpenseCurrency.builder().code("EUR").build())
-                                        .build()
-                        )
-                        .build())
+        Invoice mockExtracted = Invoice.builder()
+                .vendorName("Premium Supplier")
+                .invoiceDate("2026-06-01")
+                .invoiceId("INV-003-2026")
+                .dueDate("2026-06-30")
+                .receiverName("My Business SL")
+                .receiverTaxId("ES87654321B")
+                .subtotal("1000.00")
+                .taxAmount("210.00")
+                .total("1210.00")
+                .currency("EUR")
                 .build();
 
-        BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                .willReturn(mockResponse);
+        BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                .willReturn(mockExtracted);
 
         mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
                 .andExpect(status().isOk())
@@ -285,65 +251,27 @@ class DocumentAiResourceIT {
                 .build();
         document = this.documentRepository.save(document);
 
-        BDDMockito.given(this.fileDownloader.downloadFile(url))
-                .willReturn(mockBytes);
+        BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-        AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                .expenseDocuments(ExpenseDocument.builder()
-                        .summaryFields(
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("VENDOR_NAME").build())
-                                        .valueDetection(ExpenseDetection.builder().text("Multi Items Corp").build())
-                                        .build(),
-                                ExpenseField.builder()
-                                        .type(ExpenseType.builder().text("TOTAL").build())
-                                        .valueDetection(ExpenseDetection.builder().text("600.00").build())
-                                        .currency(ExpenseCurrency.builder().code("USD").build())
-                                        .build()
-                        )
-                        .lineItemGroups(
-                                LineItemGroup.builder()
-                                        .lineItems(
-                                                LineItemFields.builder()
-                                                        .lineItemExpenseFields(
-                                                                ExpenseField.builder()
-                                                                        .type(ExpenseType.builder().text("ITEM").build())
-                                                                        .valueDetection(ExpenseDetection.builder().text("Product A").build())
-                                                                        .build(),
-                                                                ExpenseField.builder()
-                                                                        .type(ExpenseType.builder().text("QUANTITY").build())
-                                                                        .valueDetection(ExpenseDetection.builder().text("3").build())
-                                                                        .build(),
-                                                                ExpenseField.builder()
-                                                                        .type(ExpenseType.builder().text("UNIT_PRICE").build())
-                                                                        .valueDetection(ExpenseDetection.builder().text("100.00").build())
-                                                                        .build()
-                                                        )
-                                                        .build(),
-                                                LineItemFields.builder()
-                                                        .lineItemExpenseFields(
-                                                                ExpenseField.builder()
-                                                                        .type(ExpenseType.builder().text("ITEM").build())
-                                                                        .valueDetection(ExpenseDetection.builder().text("Product B").build())
-                                                                        .build(),
-                                                                ExpenseField.builder()
-                                                                        .type(ExpenseType.builder().text("QUANTITY").build())
-                                                                        .valueDetection(ExpenseDetection.builder().text("2").build())
-                                                                        .build(),
-                                                                ExpenseField.builder()
-                                                                        .type(ExpenseType.builder().text("PRICE").build())
-                                                                        .valueDetection(ExpenseDetection.builder().text("150.00").build())
-                                                                        .build()
-                                                        )
-                                                        .build()
-                                        )
-                                        .build()
-                        )
-                        .build())
+        Invoice mockExtracted = Invoice.builder()
+                .vendorName("Multi Items Corp")
+                .total("600.00")
+                .currency("USD")
+                .lineItems(List.of(
+                        es.upm.api.data.entities.LineItem.builder()
+                                .name("Product A")
+                                .quantity("3")
+                                .unitPrice("100.00")
+                                .build(),
+                        es.upm.api.data.entities.LineItem.builder()
+                                .name("Product B")
+                                .quantity("2")
+                                .price("150.00")
+                                .build()))
                 .build();
 
-        BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                .willReturn(mockResponse);
+        BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                .willReturn(mockExtracted);
 
         mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
                 .andExpect(status().isOk())
@@ -370,15 +298,10 @@ class DocumentAiResourceIT {
                 .build();
         document = this.documentRepository.save(document);
 
-        BDDMockito.given(this.fileDownloader.downloadFile(url))
-                .willReturn(mockBytes);
+        BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-        AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                .expenseDocuments(new ExpenseDocument[]{})
-                .build();
-
-        BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                .willReturn(mockResponse);
+        BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                .willThrow(new TextractExtractionException("No se pudo extraer información de la factura"));
 
         mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
                 .andExpect(status().isBadRequest());
@@ -396,8 +319,7 @@ class DocumentAiResourceIT {
                 .build();
         document = this.documentRepository.save(document);
 
-        BDDMockito.given(this.fileDownloader.downloadFile(url))
-                .willThrow(new BadRequestException("Error al descargar el archivo desde la URL"));
+        BDDMockito.doThrow(new IOException("connection failed")).when(this.fileDownloader).downloadFile(url);
 
         mockMvc.perform(get(DocumentAiResource.DOCUMENT_AI + DocumentAiResource.DOCUMENTS + "/" + document.getId() + DocumentAiResource.EXTRACT_INVOICE))
                 .andExpect(status().isBadRequest());

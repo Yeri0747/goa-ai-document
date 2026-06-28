@@ -3,7 +3,6 @@ package es.upm.api.resources;
 import es.upm.api.resources.dtos.DocumentResponseDto;
 import es.upm.api.resources.dtos.InvoiceExtractionResponseDto;
 import es.upm.api.services.DocumentAiService;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;

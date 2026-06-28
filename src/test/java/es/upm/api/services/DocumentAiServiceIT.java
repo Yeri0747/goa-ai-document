@@ -7,6 +7,7 @@ import es.upm.api.data.entities.Invoice;
 import es.upm.api.infrastructure.clients.AwsTextractClient;
 import es.upm.api.infrastructure.clients.OpenAiClassifierClient;
 import es.upm.api.infrastructure.clients.S3CloudClient;
+import es.upm.api.infrastructure.clients.TextractExtractionException;
 import es.upm.api.infrastructure.support.FileDownloader;
 import es.upm.api.infrastructure.support.PdfExtractor;
 import es.upm.api.exceptions.BadRequestException;
@@ -19,8 +20,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import software.amazon.awssdk.services.textract.model.*;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -140,111 +142,38 @@ class DocumentAiServiceIT {
         }
 
         @Test
-        void testExtractInvoiceSuccess() {
+        void testSummarizeDocumentNotFound() {
+                NotFoundException exception = assertThrows(
+                                NotFoundException.class,
+                                () -> this.documentAiService.summarizeDocument("non-existent-id")
+                );
+                assertThat(exception.getMessage()).contains("Document not found");
+        }
+
+        @Test
+        void testExtractInvoiceSuccess() throws IOException {
                 String url = "https://mock-invoices.com/invoice-001.pdf";
                 byte[] mockBytes = "mock pdf content".getBytes();
 
-                BDDMockito.given(this.fileDownloader.downloadFile(url))
-                                .willReturn(mockBytes);
+                BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-                AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                                .expenseDocuments(ExpenseDocument.builder()
-                                                .summaryFields(
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder()
-                                                                                                .text("VENDOR_NAME")
-                                                                                                .build())
-                                                                                .valueDetection(ExpenseDetection
-                                                                                                .builder()
-                                                                                                .text("ACME Corp")
-                                                                                                .build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text(
-                                                                                                "INVOICE_RECEIPT_DATE")
-                                                                                                .build())
-                                                                                .valueDetection(ExpenseDetection
-                                                                                                .builder()
-                                                                                                .text("2026-06-21")
-                                                                                                .build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text(
-                                                                                                "INVOICE_RECEIPT_ID")
-                                                                                                .build())
-                                                                                .valueDetection(ExpenseDetection
-                                                                                                .builder()
-                                                                                                .text("INV-987")
-                                                                                                .build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder()
-                                                                                                .text("TOTAL").build())
-                                                                                .valueDetection(ExpenseDetection
-                                                                                                .builder()
-                                                                                                .text("150.00").build())
-                                                                                .currency(ExpenseCurrency.builder()
-                                                                                                .code("EUR").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("TAX")
-                                                                                                .build())
-                                                                                .valueDetection(ExpenseDetection
-                                                                                                .builder().text("21.00")
-                                                                                                .build())
-                                                                                .build())
-                                                .lineItemGroups(
-                                                                LineItemGroup.builder()
-                                                                                .lineItems(
-                                                                                                LineItemFields.builder()
-                                                                                                                .lineItemExpenseFields(
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("ITEM")
-                                                                                                                                                                .build())
-                                                                                                                                                .valueDetection(ExpenseDetection
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("Consulting Services")
-                                                                                                                                                                .build())
-                                                                                                                                                .build(),
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("QUANTITY")
-                                                                                                                                                                .build())
-                                                                                                                                                .valueDetection(ExpenseDetection
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("1")
-                                                                                                                                                                .build())
-                                                                                                                                                .build(),
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("UNIT_PRICE")
-                                                                                                                                                                .build())
-                                                                                                                                                .valueDetection(ExpenseDetection
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("123.97")
-                                                                                                                                                                .build())
-                                                                                                                                                .build(),
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("PRICE")
-                                                                                                                                                                .build())
-                                                                                                                                                .valueDetection(ExpenseDetection
-                                                                                                                                                                .builder()
-                                                                                                                                                                .text("123.97")
-                                                                                                                                                                .build())
-                                                                                                                                                .build())
-                                                                                                                .build())
-                                                                                .build())
-                                                .build())
+                Invoice mockExtracted = Invoice.builder()
+                                .vendorName("ACME Corp")
+                                .invoiceDate("2026-06-21")
+                                .invoiceId("INV-987")
+                                .total("150.00")
+                                .taxAmount("21.00")
+                                .currency("EUR")
+                                .lineItems(List.of(es.upm.api.data.entities.LineItem.builder()
+                                                .name("Consulting Services")
+                                                .quantity("1")
+                                                .unitPrice("123.97")
+                                                .price("123.97")
+                                                .build()))
                                 .build();
 
-                BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                                .willReturn(mockResponse);
+                BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                                .willReturn(mockExtracted);
 
                 // First extraction should hit downloader and AWS Client
                 // Create a Document with URL and save to DB, then call by documentId
@@ -276,10 +205,9 @@ class DocumentAiServiceIT {
         }
 
         @Test
-        void testExtractInvoiceDownloadFailure() {
+        void testExtractInvoiceDownloadFailure() throws IOException {
                 String url = "https://mock-invoices.com/missing.pdf";
-                BDDMockito.given(this.fileDownloader.downloadFile(url))
-                                .willThrow(new BadRequestException("Error al descargar el archivo desde la URL"));
+                BDDMockito.doThrow(new IOException("connection failed")).when(this.fileDownloader).downloadFile(url);
 
                 // For download failure, create document and call by id
                 Document missingDoc = Document.builder().url(url).build();
@@ -288,14 +216,14 @@ class DocumentAiServiceIT {
         }
 
         @Test
-        void testExtractInvoiceTextractFailure() {
+        void testExtractInvoiceTextractFailure() throws IOException {
                 String url = "https://mock-invoices.com/invoice-error.pdf";
                 byte[] mockBytes = "mock pdf content".getBytes();
 
-                BDDMockito.given(this.fileDownloader.downloadFile(url))
-                                .willReturn(mockBytes);
-                BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                                .willThrow(new RuntimeException("AWS SDK Error"));
+                BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
+                BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                                .willThrow(new TextractExtractionException(
+                                                "Error al procesar la factura con AWS Textract: AWS SDK Error"));
 
                 Document errorDoc = Document.builder().url(url).build();
                 Document savedError = this.documentRepository.save(errorDoc);
@@ -313,93 +241,50 @@ class DocumentAiServiceIT {
         }
 
         @Test
-        void testExtractInvoiceEmptyExpenseDocuments() {
+        void testExtractInvoiceEmptyExpenseDocuments() throws IOException {
                 String url = "https://mock-invoices.com/empty-invoice.pdf";
                 byte[] mockBytes = "mock pdf content".getBytes();
 
                 Document doc = Document.builder().url(url).build();
                 Document saved = this.documentRepository.save(doc);
 
-                BDDMockito.given(this.fileDownloader.downloadFile(url))
-                                .willReturn(mockBytes);
+                BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-                AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                                .expenseDocuments(new ExpenseDocument[]{})
-                                .build();
-
-                BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                                .willReturn(mockResponse);
+                BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                                .willThrow(new TextractExtractionException("No se pudo extraer información de la factura"));
 
                 assertThrows(BadRequestException.class, () -> this.documentAiService.extractInvoice(saved.getId()));
         }
 
         @Test
-        void testExtractInvoiceWithMultipleLineItems() {
+        void testExtractInvoiceWithMultipleLineItems() throws IOException {
                 String url = "https://mock-invoices.com/multi-items.pdf";
                 byte[] mockBytes = "mock pdf content".getBytes();
 
                 Document doc = Document.builder().url(url).build();
                 Document saved = this.documentRepository.save(doc);
 
-                BDDMockito.given(this.fileDownloader.downloadFile(url))
-                                .willReturn(mockBytes);
+                BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-                AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                                .expenseDocuments(ExpenseDocument.builder()
-                                                .summaryFields(
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("VENDOR_NAME").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("TechCorp").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("TOTAL").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("500.00").build())
-                                                                                .currency(ExpenseCurrency.builder().code("EUR").build())
-                                                                                .build()
-                                                )
-                                                .lineItemGroups(
-                                                                LineItemGroup.builder()
-                                                                                .lineItems(
-                                                                                                LineItemFields.builder()
-                                                                                                                .lineItemExpenseFields(
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType.builder().text("ITEM").build())
-                                                                                                                                                .valueDetection(ExpenseDetection.builder().text("Software License").build())
-                                                                                                                                                .build(),
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType.builder().text("QUANTITY").build())
-                                                                                                                                                .valueDetection(ExpenseDetection.builder().text("1").build())
-                                                                                                                                                .build(),
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType.builder().text("UNIT_PRICE").build())
-                                                                                                                                                .valueDetection(ExpenseDetection.builder().text("250.00").build())
-                                                                                                                                                .build()
-                                                                                                                )
-                                                                                                                .build(),
-                                                                                                LineItemFields.builder()
-                                                                                                                .lineItemExpenseFields(
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType.builder().text("ITEM").build())
-                                                                                                                                                .valueDetection(ExpenseDetection.builder().text("Support Services").build())
-                                                                                                                                                .build(),
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType.builder().text("QUANTITY").build())
-                                                                                                                                                .valueDetection(ExpenseDetection.builder().text("2").build())
-                                                                                                                                                .build(),
-                                                                                                                                ExpenseField.builder()
-                                                                                                                                                .type(ExpenseType.builder().text("PRICE").build())
-                                                                                                                                                .valueDetection(ExpenseDetection.builder().text("250.00").build())
-                                                                                                                                                .build()
-                                                                                                                )
-                                                                                                                .build()
-                                                                                )
-                                                                                .build()
-                                                )
-                                                .build())
+                Invoice mockExtracted = Invoice.builder()
+                                .vendorName("TechCorp")
+                                .total("500.00")
+                                .currency("EUR")
+                                .lineItems(List.of(
+                                                es.upm.api.data.entities.LineItem.builder()
+                                                                .name("Software License")
+                                                                .quantity("1")
+                                                                .unitPrice("250.00")
+                                                                .build(),
+                                                es.upm.api.data.entities.LineItem.builder()
+                                                                .name("Support Services")
+                                                                .quantity("2")
+                                                                .price("250.00")
+                                                                .build()))
                                 .build();
 
-                BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                                .willReturn(mockResponse);
+                BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                                .willReturn(mockExtracted);
 
                 Invoice result = this.documentAiService.extractInvoice(saved.getId());
 
@@ -412,62 +297,30 @@ class DocumentAiServiceIT {
         }
 
         @Test
-        void testExtractInvoiceWithAllFields() {
+        void testExtractInvoiceWithAllFields() throws IOException {
                 String url = "https://mock-invoices.com/complete-invoice.pdf";
                 byte[] mockBytes = "mock pdf content".getBytes();
 
                 Document doc = Document.builder().url(url).build();
                 Document saved = this.documentRepository.save(doc);
 
-                BDDMockito.given(this.fileDownloader.downloadFile(url))
-                                .willReturn(mockBytes);
+                BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-                AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                                .expenseDocuments(ExpenseDocument.builder()
-                                                .summaryFields(
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("VENDOR_NAME").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("Global Supplies Inc").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("INVOICE_RECEIPT_DATE").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("2026-06-15").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("INVOICE_RECEIPT_ID").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("INV-2026-0815").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("DUE_DATE").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("2026-07-15").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("RECEIVER_NAME").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("Our Company Ltd").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("RECEIVER_TAX_ID").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("ES12345678A").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("SUBTOTAL").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("800.00").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("TAX").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("168.00").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("TOTAL").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("968.00").build())
-                                                                                .currency(ExpenseCurrency.builder().code("EUR").build())
-                                                                                .build()
-                                                )
-                                                .build())
+                Invoice mockExtracted = Invoice.builder()
+                                .vendorName("Global Supplies Inc")
+                                .invoiceDate("2026-06-15")
+                                .invoiceId("INV-2026-0815")
+                                .dueDate("2026-07-15")
+                                .receiverName("Our Company Ltd")
+                                .receiverTaxId("ES12345678A")
+                                .subtotal("800.00")
+                                .taxAmount("168.00")
+                                .total("968.00")
+                                .currency("EUR")
                                 .build();
 
-                BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                                .willReturn(mockResponse);
+                BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                                .willReturn(mockExtracted);
 
                 Invoice result = this.documentAiService.extractInvoice(saved.getId());
 
@@ -485,34 +338,23 @@ class DocumentAiServiceIT {
         }
 
         @Test
-        void testExtractInvoiceCachingBehavior() {
+        void testExtractInvoiceCachingBehavior() throws IOException {
                 String url = "https://mock-invoices.com/cached-invoice.pdf";
                 byte[] mockBytes = "mock pdf content".getBytes();
 
                 Document doc = Document.builder().url(url).build();
                 Document saved = this.documentRepository.save(doc);
 
-                BDDMockito.given(this.fileDownloader.downloadFile(url))
-                                .willReturn(mockBytes);
+                BDDMockito.doReturn(mockBytes).when(this.fileDownloader).downloadFile(url);
 
-                AnalyzeExpenseResponse mockResponse = AnalyzeExpenseResponse.builder()
-                                .expenseDocuments(ExpenseDocument.builder()
-                                                .summaryFields(
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("VENDOR_NAME").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("Cached Corp").build())
-                                                                                .build(),
-                                                                ExpenseField.builder()
-                                                                                .type(ExpenseType.builder().text("TOTAL").build())
-                                                                                .valueDetection(ExpenseDetection.builder().text("99.99").build())
-                                                                                .currency(ExpenseCurrency.builder().code("USD").build())
-                                                                                .build()
-                                                )
-                                                .build())
+                Invoice mockExtracted = Invoice.builder()
+                                .vendorName("Cached Corp")
+                                .total("99.99")
+                                .currency("USD")
                                 .build();
 
-                BDDMockito.given(this.awsTextractClient.analyzeExpense(mockBytes))
-                                .willReturn(mockResponse);
+                BDDMockito.given(this.awsTextractClient.extractInvoice(mockBytes))
+                                .willReturn(mockExtracted);
 
                 // First call - should hit AWS
                 Invoice firstResult = this.documentAiService.extractInvoice(saved.getId());
@@ -524,6 +366,6 @@ class DocumentAiServiceIT {
                 assertThat(secondResult.getVendorName()).isEqualTo("Cached Corp");
 
                 // Verify AWS was only called once
-                BDDMockito.verify(this.awsTextractClient, BDDMockito.times(1)).analyzeExpense(mockBytes);
+                BDDMockito.verify(this.awsTextractClient, BDDMockito.times(1)).extractInvoice(mockBytes);
         }
 }

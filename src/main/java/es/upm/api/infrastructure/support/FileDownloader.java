@@ -1,22 +1,20 @@
 package es.upm.api.infrastructure.support;
 
-import es.upm.api.exceptions.BadRequestException;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 
 @Service
 public class FileDownloader {
 
-    public byte[] downloadFile(String urlString) {
+    public byte[] downloadFile(String urlString) throws IOException {
         if (urlString == null || urlString.isBlank()) {
-            throw new BadRequestException("El URL no puede estar vacío");
+            throw new IOException("El URL no puede estar vacío");
         }
         try (InputStream in = new URL(urlString).openStream()) {
             return in.readAllBytes();
-        } catch (Exception e) {
-            throw new BadRequestException("Error al descargar el archivo desde la URL: " + urlString);
         }
     }
 }
